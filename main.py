@@ -55,10 +55,25 @@ df.drop(columns=['Unnamed: 10','Unnamed: 11','Unnamed: 12','Unnamed: 13'],inplac
 print('\n\n',df.columns,'\n\n')
 
 #Certo, agora possuímos apenas as colunas que nos interessam. Observando o tipo de cada uma agora, tentaremos verificar se há erros e tratá-los:
-print(f'Contagem de valores não nulos por coluna: \n{df.isnull().sum()} \n\n')
+print(f'Contagem de valores nulos por coluna: \n{df.isnull().sum()} \n\n')
 print(f'Contagem de valores não pertencentes ao Dtype por coluna: \n{df.isna().sum()} \n\n')
 
-#Verificamos que não há valores nulos nem não pertencetes ao dtype de cada coluna. Agora vamos checar por valores repetidos
+#O valor vindo como #N/D de arquivos csv ou excel pode não ser interpretado como nulo pelo pandas, por isso, vale realizar a transformação destes para Nan ou nulo:
+df = df.replace('#N/D', np.nan,inplace=True)
+print(f'Contagem de valores nulos por coluna com substituição do N/D: \n{df.isnull().sum()} \n\n')
+
+#Agora sim esses valores apareceram como NAN nas categorias de produto, vamos avaliar eles
+display(df[df['PR_CAT'].isna()])
+#Vamos verificar se há outros produtos pertencentes ao ID 107
+display(df[df['PR_ID']==107]
+        .groupby('PR_NOME',dropna=False)
+        .size()
+        )
+#Não, somente o NaN, então podemos removê-los:
+df['PR_CAT'].dropna(inplace=True)
+print(f'Removidos {df['PR_CAT'].isna().sum()} registros NaN')
+
+#Removemos os valores NAN. Agora vamos checar por valores repetidos
 print(f'Quantidade de linhas idênticas (duplicadas): {df.duplicated().sum()}\n')
 display(df[df.duplicated()])
 #Obtemos 96553 linhas repetidas. Ao que me parece, esses registros repetidos são erros, visto que não há coluna de quantidade de produtos, portanto a informação que temos é que o cliente CL_ID, na compra CO_ID, realizada na data DATA, obteve determinado produto e essa informação repetida não nos é valiosa.
@@ -75,9 +90,81 @@ print(f'\nEstatísticas da coluna de número de filhos dos clientes: \n{df['CL_F
 
 clientes = df[['CL_ID','CL_FHL']]
 cliente_filtrado = clientes.drop_duplicates(subset='CL_ID')
-print(f'Estatísticas de número de filhos de clientes não ponderado:\n{cliente_filtrado['CL_FHL'].describe()}')
+print(f'Estatísticas de número de filhos de clientes não ponderado:\n{cliente_filtrado['CL_FHL'].describe()}\n\n')
 
 #Apesar dessa diferente interpretação, os resultados coincidentemente foram bem similares.A contagem é de registros foi de 733447 para 1000, o que indica que possuímos 1000 clientes distintos em nossa base
 #Uma média de 1,13 filho por cliente, com desvio padrão significativo, e verifica-se que a maior parte de nossos clientes não possuem filhos
 
+
+#2. Padrões de agrupamento
+#Para análise de padrões de agrupamento, vamos analisar quantidade de registros por gênero, por categoria de produtos e por classe econômica
+#2.1Primeiramente analisaremos os agrupamentos e dados individuais:
+#Gênero:
+print(df.groupby(['CL_GENERO']).size())
+porcentagem_m = ((df['CL_GENERO']=='M').sum()/len(df)) * 100
+porcentagem_f = ((df['CL_GENERO']=='F').sum()/len(df)) * 100
+print(f'\nPorcentagem de registros Masculino: {porcentagem_m:.2f}%')
+print(f'Porcentagem de registros Feminino: {porcentagem_f:.2f}%\n\n')
+#Portanto a maioria de nossos clientes são do Gênero Feminino
+
+#Categoria de Produtos:
+print(df.groupby(['PR_CAT']).size())
+porcentagem_ac = ((df['PR_CAT']=='ACESSORIOS').sum()/len(df)) * 100
+porcentagem_al = ((df['PR_CAT']=='ALIMENTOS').sum()/len(df)) * 100
+porcentagem_be = ((df['PR_CAT']=='BEBIDAS').sum()/len(df)) * 100
+porcentagem_hi = ((df['PR_CAT']=='HIGIENE').sum()/len(df)) * 100
+porcentagem_li = ((df['PR_CAT']=='LIMPEZA').sum()/len(df)) * 100
+porcentagem_pe = ((df['PR_CAT']=='PET').sum()/len(df)) * 100
+print(f'\nPorcentagem de registros ACESSORIOS: {porcentagem_ac:.2f}%')
+print(f'Porcentagem de registros ALIMENTOS: {porcentagem_al:.2f}%')
+print(f'Porcentagem de registros BEBIDAS: {porcentagem_be:.2f}%')
+print(f'Porcentagem de registros HIGIENE: {porcentagem_hi:.2f}%')
+print(f'Porcentagem de registros LIMPEZA: {porcentagem_li:.2f}%')
+print(f'Porcentagem de registros PET: {porcentagem_pe:.2f}%\n\n')
+#Verificamos que mais da metade dos registros advém da compra de alimentos (52,38%) e que apenas 1,75% deles advém de acessorios
+
+#Classe Econômica:
+print(df.groupby(['CL_SEG']).size())
+porcentagem_a = ((df['CL_SEG']=='A').sum()/len(df)) * 100
+porcentagem_b = ((df['CL_SEG']=='B').sum()/len(df)) * 100
+porcentagem_c = ((df['CL_SEG']=='C').sum()/len(df)) * 100
+print(f'Porcentagem de registros Classe A: {porcentagem_a:.2f}%')
+print(f'Porcentagem de registros Classe B: {porcentagem_b:.2f}%')
+print(f'Porcentagem de registros Classe C: {porcentagem_c:.2f}%\n')
+#Verificamos que a maior parte de nossos clientes pertencem a classe B
+
+#2.2.Verificaremos agora a relação entre essas categorias utilizando o pivot_tables:
+#Vamos verificar se há relação entre classe econÇomica de cliente e categoria de produto
+
+#Número de registros contados e distribuídos pela relação segmento de classe econômica do cliente e categoria de produto
+tabela_seg_cat = df.pivot_table(
+    index='CL_SEG',
+    columns='PR_CAT',
+    aggfunc='size'
+    )
+
+#Calculo do percentual de cada categoria pela linha de classe econômica:
+tabela_percentual = tabela_seg_cat.div(tabela_seg_cat.sum(axis=1), axis=0) * 100
+display(tabela_percentual,'\n')
+#Verifca-se que não há tendência de categorias de produto em função da classe econômica
+
+#Agora, verificaremos se há relação entre gênero e categorias de produto, utilizando o mesmo método:
+tabela_gen_cat = df.pivot_table(
+    index='CL_GENERO',
+    columns='PR_CAT',
+    aggfunc='size'
+    )
+tabela_percentual = tabela_gen_cat.div(tabela_gen_cat.sum(axis=1), axis=0) * 100
+display(tabela_percentual,'\n')
+#Também não apoarenta haver tendências
+
+#Finalmente, verificaremos se há relação entre genero e classe econômica:
+tabela_gen_seg = df.pivot_table(
+    index='CL_GENERO',
+    columns='CL_SEG',
+    aggfunc='size'
+    )
+tabela_percentual = tabela_gen_seg.div(tabela_gen_seg.sum(axis=1), axis=0) * 100
+display(tabela_percentual)
+#Aqui, uma leve tendência parece indicar que há mais pessoas do gênero feminino pertencentes a classe C do que pessoas do gênero masculino. Entretanto a percentagem de pessoas pertencentes à classe A é bastante similar
 
