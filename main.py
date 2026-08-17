@@ -1,7 +1,6 @@
 #Importação das bibliotecas
 import pandas as pd
 import numpy as np
-import matplotlib as plt
 from IPython.display import display
 
 #Lietura do CSV utilizando pandas
@@ -59,7 +58,7 @@ print(f'Contagem de valores nulos por coluna: \n{df.isnull().sum()} \n\n')
 print(f'Contagem de valores não pertencentes ao Dtype por coluna: \n{df.isna().sum()} \n\n')
 
 #O valor vindo como #N/D de arquivos csv ou excel pode não ser interpretado como nulo pelo pandas, por isso, vale realizar a transformação destes para Nan ou nulo:
-df = df.replace('#N/D', np.nan,inplace=True)
+df = df.replace('#N/D', np.nan)
 print(f'Contagem de valores nulos por coluna com substituição do N/D: \n{df.isnull().sum()} \n\n')
 
 #Agora sim esses valores apareceram como NAN nas categorias de produto, vamos avaliar eles
@@ -70,7 +69,7 @@ display(df[df['PR_ID']==107]
         .size()
         )
 #Não, somente o NaN, então podemos removê-los:
-df['PR_CAT'].dropna(inplace=True)
+df.dropna(subset=['PR_CAT'], inplace=True)
 print(f'Removidos {df['PR_CAT'].isna().sum()} registros NaN')
 
 #Removemos os valores NAN. Agora vamos checar por valores repetidos
